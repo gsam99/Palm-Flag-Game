@@ -1,5 +1,5 @@
-const SERVER_URL = "https://palm-flag-api.onrender.com";
-const WEBSOCKET_URL = "wss://palm-flag-api.onrender.com";
+const SERVER_URL = "https://palm-flag-game.onrender.com";
+const WEBSOCKET_URL = "wss://palm-flag-game.onrender.com";
 
 export async function createRoom() {
   const response = await fetch(`${SERVER_URL}/rooms`, { method: "POST" });
