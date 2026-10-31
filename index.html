@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Palm Flag 3D</title>
+
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0d1f14;
+        font-family: "Segoe UI", Arial, sans-serif;
+      }
+
+      /* 16:9 game box, sized from JS so it fits any screen. */
+      #game {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        overflow: hidden;
+      }
+
+      #game canvas {
+        display: block;
+      }
+
+      #flash {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      #banner {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        color: #fff;
+      }
+
+      #banner .title {
+        font-size: 6em;
+        font-weight: 900;
+        -webkit-text-stroke: 0.06em #000;
+      }
+
+      #banner .reason {
+        margin-top: 0.2em;
+        font-size: 2em;
+        font-weight: 800;
+        text-shadow: 0 0.1em 0.3em #000;
+      }
+
+      #banner .sub {
+        margin-top: 0.4em;
+        font-size: 1.6em;
+        font-weight: 700;
+        opacity: 0.9;
+        text-shadow: 0 0.1em 0.3em #000;
+      }
+
+      #help {
+        position: absolute;
+        bottom: 0.6em;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 0.3em 1em;
+        border-radius: 1em;
+        background: rgba(0, 0, 0, 0.4);
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 0.95em;
+        white-space: nowrap;
+        pointer-events: none;
+      }
+
+      /* ---------- health bars ---------- */
+
+      #healthHud {
+        position: absolute;
+        top: 0.8em;
+        left: 1.2em;
+        right: 1.2em;
+        display: flex;
+        justify-content: space-between;
+        pointer-events: none;
+      }
+
+      .hp {
+        display: flex;
+        align-items: center;
+        gap: 0.6em;
+        padding: 0.45em 0.9em;
+        border-radius: 2em;
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+        font-size: 1.05em;
+        font-weight: 800;
+      }
+
+      .hp-red {
+        flex-direction: row-reverse;
+      }
+
+      .hp-name {
+        max-width: 8em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .hp-blue .hp-name {
+        color: #6aa8ff;
+      }
+
+      .hp-red .hp-name {
+        color: #ff7a7a;
+      }
+
+      .hp-track {
+        display: flex;
+        width: 11em;
+        height: 0.8em;
+        border-radius: 1em;
+        background: rgba(255, 255, 255, 0.18);
+        overflow: hidden;
+      }
+
+      .hp-fill {
+        width: 100%;
+        height: 100%;
+        border-radius: inherit;
+        transition: width 0.25s ease-out;
+      }
+
+      .hp-blue .hp-fill {
+        background: #4d97ff;
+      }
+
+      /* Red's bar drains toward its own side of the screen. */
+      .hp-red .hp-fill {
+        margin-left: auto;
+        background: #ff5a5a;
+      }
+
+      .hp.low .hp-track {
+        animation: hp-low 0.8s ease-in-out infinite alternate;
+      }
+
+      @keyframes hp-low {
+        to {
+          background: rgba(255, 204, 0, 0.45);
+        }
+      }
+
+      .hp-value {
+        min-width: 2.2em;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Small bars above each player's head (positioned from game.js). */
+      .head-hp {
+        position: absolute;
+        width: 3.6em;
+        height: 0.45em;
+        margin-left: -1.8em;
+        padding: 0.12em;
+        border-radius: 1em;
+        background: rgba(0, 0, 0, 0.55);
+        pointer-events: none;
+      }
+
+      .head-hp > div {
+        width: 100%;
+        height: 100%;
+        border-radius: inherit;
+        transition: width 0.25s ease-out;
+      }
+
+      .head-hp-blue > div {
+        background: #4d97ff;
+      }
+
+      .head-hp-red > div {
+        background: #ff5a5a;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .hp.low .hp-track {
+          animation: none;
+        }
+      }
+
+      /* ---------- lobby ---------- */
+
+      [hidden] {
+        display: none !important;
+      }
+
+      #lobby {
+        --lobby-card: #13241a;
+        --lobby-line: rgba(255, 255, 255, 0.14);
+        --lobby-text: #ffffff;
+        --lobby-muted: #b9cbbf;
+        --lobby-green: #2f8f46;
+        --lobby-green-hover: #38a352;
+        --lobby-ghost: rgba(255, 255, 255, 0.08);
+        --lobby-ghost-hover: rgba(255, 255, 255, 0.16);
+        --lobby-blue: #6aa8ff;
+        --lobby-red: #ff7a7a;
+
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        background: rgba(4, 15, 10, 0.78);
+        color: var(--lobby-text);
+        font-family: "Segoe UI", Arial, sans-serif;
+      }
+
+      #lobby.hidden {
+        display: none;
+      }
+
+      .lobby-card {
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        width: min(100%, 400px);
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
+        padding: 2rem;
+        border: 1px solid var(--lobby-line);
+        border-radius: 1rem;
+        background: var(--lobby-card);
+        box-shadow: 0 1.5rem 3rem rgba(0, 0, 0, 0.5);
+      }
+
+      .lobby-view {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+
+      .lobby-header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+
+      .lobby-brand {
+        text-align: center;
+      }
+
+      .lobby-teams {
+        display: flex;
+        justify-content: center;
+        gap: 0.4rem;
+        margin-bottom: 0.25rem;
+      }
+
+      .lobby-teams span {
+        width: 0.7rem;
+        height: 0.7rem;
+        border-radius: 50%;
+        background: var(--lobby-blue);
+      }
+
+      .lobby-teams span + span {
+        background: var(--lobby-red);
+      }
+
+      .lobby-card h1,
+      .lobby-card h2 {
+        margin: 0;
+        line-height: 1.15;
+        text-wrap: balance;
+      }
+
+      .lobby-card h1 {
+        font-size: 2rem;
+      }
+
+      .lobby-card h2 {
+        font-size: 1.5rem;
+      }
+
+      .lobby-card p {
+        margin: 0;
+        color: var(--lobby-muted);
+        line-height: 1.5;
+      }
+
+      .lobby-tagline {
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .lobby-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+
+      .lobby-field label {
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+
+      .lobby-card input {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 0.75rem 0.85rem;
+        border: 1px solid #708477;
+        border-radius: 0.5rem;
+        background: #f7faf8;
+        color: #14261b;
+        font: inherit;
+      }
+
+      .lobby-card input:focus-visible {
+        outline: 3px solid var(--lobby-green-hover);
+        outline-offset: 1px;
+      }
+
+      #roomIdInput {
+        font-family: Consolas, "Courier New", monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .lobby-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+
+      .lobby-card button {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 0.8rem 1rem;
+        border: 0;
+        border-radius: 0.5rem;
+        background: var(--lobby-green);
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+
+      .lobby-card button:hover {
+        background: var(--lobby-green-hover);
+      }
+
+      .lobby-card button.secondary {
+        background: var(--lobby-ghost);
+        box-shadow: inset 0 0 0 1px var(--lobby-line);
+      }
+
+      .lobby-card button.secondary:hover {
+        background: var(--lobby-ghost-hover);
+      }
+
+      .lobby-card button:focus-visible {
+        outline: 3px solid #ffffff;
+        outline-offset: 2px;
+      }
+
+      .lobby-card button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* Small text-style Back button above each view's title. */
+      .lobby-card button.back-link {
+        align-self: flex-start;
+        width: auto;
+        padding: 0.3rem 0.1rem;
+        background: none;
+        color: var(--lobby-muted);
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+
+      .lobby-card button.back-link:hover {
+        background: none;
+        color: var(--lobby-text);
+      }
+
+      /* Room ID with its Copy button on one line. */
+      .room-code {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 0.75rem 0.75rem 1rem;
+        border: 1px dashed rgba(255, 255, 255, 0.35);
+        border-radius: 0.6rem;
+        background: rgba(0, 0, 0, 0.25);
+      }
+
+      .room-code-text {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 0.15rem;
+        min-width: 0;
+      }
+
+      .room-code-label {
+        color: var(--lobby-muted);
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      #roomCodeDisplay {
+        overflow-wrap: anywhere;
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 1.4rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+      }
+
+      .lobby-card .room-code button {
+        width: auto;
+        flex-shrink: 0;
+        padding: 0.55rem 0.9rem;
+      }
+
+      /* Status message and the Open game button sit together at the bottom. */
+      .lobby-footer {
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--lobby-line);
+      }
+
+      #roomStatus {
+        min-height: 1.5em;
+        font-size: 0.95rem;
+      }
+
+      /* On the first screen everything is centered, so center the status too. */
+      .lobby-card:has(#startChoice:not([hidden])) #roomStatus {
+        text-align: center;
+      }
+
+      /* ---------- rules screen ---------- */
+
+      .lobby-card:has(#rulesView:not([hidden])) {
+        width: min(100%, 480px);
+        padding-bottom: 0;
+      }
+
+      #rulesView {
+        gap: 1rem;
+      }
+
+      #rulesView h1 {
+        font-size: 1.7rem;
+      }
+
+      /* Keep the "Got it" button visible even when the rules need scrolling. */
+      #rulesView .lobby-actions {
+        position: sticky;
+        bottom: 0;
+        padding: 0.75rem 0 1.5rem;
+        background: linear-gradient(transparent, var(--lobby-card) 0.75rem);
+      }
+
+      .rules {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .rules li {
+        display: grid;
+        grid-template-columns: 2.25rem 1fr;
+        gap: 0.75rem;
+        align-items: start;
+      }
+
+      .rule-icon {
+        display: grid;
+        place-items: center;
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 0.6rem;
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 1.05rem;
+        font-weight: 800;
+      }
+
+      .rule-icon.blue {
+        background: rgba(106, 168, 255, 0.2);
+        color: var(--lobby-blue);
+      }
+
+      .rule-icon.red {
+        background: rgba(255, 122, 122, 0.2);
+        color: var(--lobby-red);
+      }
+
+      .rule-icon.gold {
+        background: rgba(255, 204, 0, 0.18);
+        color: #ffcc00;
+      }
+
+      .rules h3 {
+        margin: 0 0 0.2rem;
+        font-size: 1rem;
+      }
+
+      .rules p {
+        font-size: 0.9rem;
+        line-height: 1.4;
+      }
+
+      .lobby-card kbd {
+        display: inline-block;
+        min-width: 1.2em;
+        padding: 0.05em 0.4em;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        border-bottom-width: 2px;
+        border-radius: 0.3em;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--lobby-text);
+        font: inherit;
+        font-size: 0.85em;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      .lobby-card button.text-link {
+        align-self: center;
+        width: auto;
+        padding: 0.3rem 0.5rem;
+        background: none;
+        color: var(--lobby-muted);
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-decoration: underline;
+        text-underline-offset: 0.2em;
+      }
+
+      .lobby-card button.text-link:hover {
+        background: none;
+        color: var(--lobby-text);
+      }
+
+      @media (max-width: 420px) {
+        .lobby-card {
+          padding: 1.5rem 1.25rem;
+        }
+      }
+    </style>
+
+    <!-- Maps Three.js imports to CDN URLs. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <section id="lobby" aria-label="Game lobby">
+      <div class="lobby-card">
+        <div id="rulesView" class="lobby-view">
+          <div class="lobby-header lobby-brand">
+            <div class="lobby-teams" aria-hidden="true"><span></span><span></span></div>
+            <h1>Palm Flag</h1>
+            <p class="lobby-tagline">How to play</p>
+          </div>
+
+          <ol class="rules">
+            <li>
+              <span class="rule-icon gold" aria-hidden="true">★</span>
+              <div>
+                <h3>Two ways to win</h3>
+                <p>Bring the enemy flag back to your base, or knock out your rival with paintballs.</p>
+              </div>
+            </li>
+            <li>
+              <span class="rule-icon blue" aria-hidden="true">⚑</span>
+              <div>
+                <h3>Capture the flag</h3>
+                <p>
+                  Grab the flag from the other team's base and carry it home to win.
+                  Your own flag must be at home when you get there.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="rule-icon red" aria-hidden="true">●</span>
+              <div>
+                <h3>Paintballs</h3>
+                <p>
+                  You have 100 health and each hit takes 20, so 5 hits is a knockout.
+                  Hit a flag carrier to send the flag home.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="rule-icon" aria-hidden="true">!</span>
+              <div>
+                <h3>Watch the arena</h3>
+                <p>
+                  Walls block players and paintballs. The striped barriers slide back
+                  and forth, so time your runs.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="rule-icon" aria-hidden="true">⌨</span>
+              <div>
+                <h3>Controls</h3>
+                <p>
+                  <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> move ·
+                  <kbd>Space</kbd> shoot · <kbd>R</kbd> play again after a match
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="rule-icon" aria-hidden="true">⇄</span>
+              <div>
+                <h3>Teams</h3>
+                <p>
+                  Whoever creates the room plays Blue (left side). Whoever joins plays
+                  Red (right side).
+                </p>
+              </div>
+            </li>
+          </ol>
+
+          <div class="lobby-actions">
+            <button id="closeRulesView" type="button">Got it, let's play</button>
+          </div>
+        </div>
+
+        <div id="startChoice" class="lobby-view" hidden>
+          <div class="lobby-header lobby-brand">
+            <div class="lobby-teams" aria-hidden="true"><span></span><span></span></div>
+            <h1>Palm Flag</h1>
+            <p class="lobby-tagline">Capture the flag · 2 players</p>
+          </div>
+          <p class="lobby-brand">
+            Create a new game and share the room ID, or join a friend’s game
+            with theirs.
+          </p>
+          <div class="lobby-actions">
+            <button id="showCreateView" type="button">Create game</button>
+            <button id="showJoinView" class="secondary" type="button">
+              Join a room
+            </button>
+          </div>
+          <button id="showRulesView" class="text-link" type="button">
+            How to play
+          </button>
+        </div>
+
+        <div id="createView" class="lobby-view" hidden>
+          <button id="backFromCreate" class="back-link" type="button">
+            ← Back
+          </button>
+          <div class="lobby-header">
+            <h2>Create game</h2>
+            <p>Enter your name, then share the room ID with the other player.</p>
+          </div>
+          <div class="lobby-field">
+            <label for="createPlayerName">Player name</label>
+            <input
+              id="createPlayerName"
+              maxlength="20"
+              autocomplete="nickname"
+              placeholder="Your name"
+            />
+          </div>
+          <div class="lobby-actions">
+            <button id="createRoomButton" type="button">Create room</button>
+          </div>
+          <div id="roomCodeRow" class="room-code" hidden>
+            <div class="room-code-text">
+              <span class="room-code-label">Room ID</span>
+              <span id="roomCodeDisplay"></span>
+            </div>
+            <button id="copyRoomButton" class="secondary" type="button" hidden>
+              Copy
+            </button>
+          </div>
+        </div>
+
+        <div id="joinView" class="lobby-view" hidden>
+          <button id="backFromJoin" class="back-link" type="button">
+            ← Back
+          </button>
+          <div class="lobby-header">
+            <h2>Join game</h2>
+            <p>Enter your name and the room ID the other player shared with you.</p>
+          </div>
+          <div class="lobby-field">
+            <label for="joinPlayerName">Player name</label>
+            <input
+              id="joinPlayerName"
+              maxlength="20"
+              autocomplete="nickname"
+              placeholder="Your name"
+            />
+          </div>
+          <div class="lobby-field">
+            <label for="roomIdInput">Room ID</label>
+            <input
+              id="roomIdInput"
+              maxlength="16"
+              autocomplete="off"
+              placeholder="8D8F61FB"
+            />
+          </div>
+          <div class="lobby-actions">
+            <button id="joinRoomButton" type="button">Join room</button>
+          </div>
+        </div>
+
+        <div id="lobbyFooter" class="lobby-footer" hidden>
+          <p id="roomStatus" role="status">
+            Choose Create game or Join a room to begin.
+          </p>
+          <button id="enterGameButton" type="button" hidden>Open game</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="game">
+      <div id="healthHud">
+        <div class="hp hp-blue">
+          <span class="hp-name" id="hpNameBlue">BLUE</span>
+          <div class="hp-track"><div class="hp-fill" id="hpFillBlue"></div></div>
+          <span class="hp-value" id="hpValueBlue">100</span>
+        </div>
+        <div class="hp hp-red">
+          <span class="hp-name" id="hpNameRed">RED</span>
+          <div class="hp-track"><div class="hp-fill" id="hpFillRed"></div></div>
+          <span class="hp-value" id="hpValueRed">100</span>
+        </div>
+      </div>
+
+      <div id="flash"></div>
+
+      <div id="banner">
+        <div class="title"></div>
+        <div class="reason"></div>
+        <div class="sub">Press R to play again</div>
+      </div>
+
+      <div id="help">
+        Move: Arrow keys &nbsp;·&nbsp; Shoot: Space &nbsp;·&nbsp; Win: capture the flag or knock out your rival
+      </div>
+    </div>
+
+    <script type="module" src="game.js"></script>
+    <script type="module" src="lobby.js"></script>
+  </body>
+</html>
