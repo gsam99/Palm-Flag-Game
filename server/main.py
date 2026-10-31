@@ -8,7 +8,11 @@ app = FastAPI()
 # The browser lobby calls the HTTP create-room endpoint from the frontend port.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_origins=[
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "https://palm-flag-game-frontend.onrender.com",
+    ],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
